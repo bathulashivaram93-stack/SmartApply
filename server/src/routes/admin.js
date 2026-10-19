@@ -25,6 +25,15 @@ router.post("/users", async (req, res) => {
     if (!DEPARTMENTS.includes(department)) return res.status(400).json({ message: "Choose a valid department" });
     if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
 
+    if (role === "hod") {
+      const existingHod = await User.findOne({ role: "hod", department });
+      if (existingHod) {
+        return res.status(409).json({
+          message: `An HOD account already exists for ${department}.`,
+        });
+      }
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
     if (await User.findOne({ email: normalizedEmail })) {
       return res.status(409).json({ message: "This email is already registered" });

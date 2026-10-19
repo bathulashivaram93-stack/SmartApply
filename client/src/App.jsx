@@ -30,6 +30,14 @@ const emptyLogin = {
   password: "",
 };
 
+const emptyStaffAccount = {
+  name: "",
+  email: "",
+  password: "",
+  role: "faculty",
+  department: "CSE",
+};
+
 const emptyApplication = {
   title: "",
   type: REQUEST_TYPES[0],
@@ -69,6 +77,8 @@ export default function App() {
 
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [loginForm, setLoginForm] = useState(emptyLogin);
+  const [staffAccountForm, setStaffAccountForm] = useState(emptyStaffAccount);
+  const [staffAccounts, setStaffAccounts] = useState([]);
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
 
   const [attachment, setAttachment] = useState(null);
@@ -115,6 +125,11 @@ export default function App() {
     [applications]
   );
 
+  const loadStaffAccounts = useCallback(async () => {
+    const result = await api("/admin/users");
+    setStaffAccounts(result.users || []);
+  }, []);
+
   const loadApplications = useCallback(async () => {
     const result = await api("/applications");
     setApplications(result.applications || []);
@@ -141,6 +156,10 @@ export default function App() {
     try {
       await loadApplications();
 
+      if (user.role === "admin") {
+        await loadStaffAccounts();
+      }
+
       if (user.role === "student" || user.role === "admin") {
         await loadStaff(
           user.role === "student"
@@ -151,7 +170,7 @@ export default function App() {
     } catch (error) {
       setPageError(getErrorMessage(error));
     }
-  }, [user, applicationForm.department, loadApplications, loadStaff]);
+  }, [user, applicationForm.department, loadApplications, loadStaff, loadStaffAccounts]);
 
   useEffect(() => {
     if (user) {
@@ -219,6 +238,34 @@ export default function App() {
     }
   }
 
+  async function handleCreateStaffAccount(event) {
+    event.preventDefault();
+    setLoading(true);
+    setPageError("");
+    setPageMessage("");
+
+    try {
+      const result = await api("/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          name: staffAccountForm.name.trim(),
+          email: staffAccountForm.email.trim(),
+          password: staffAccountForm.password,
+          role: staffAccountForm.role,
+          department: staffAccountForm.department,
+        }),
+      });
+
+      setPageMessage(result.message || "Staff account created successfully.");
+      setStaffAccountForm(emptyStaffAccount);
+      await loadStaffAccounts();
+    } catch (error) {
+      setPageError(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleLogin(event) {
     event.preventDefault();
     setLoading(true);
@@ -257,6 +304,7 @@ export default function App() {
 
     setUser(null);
     setApplications([]);
+    setStaffAccounts([]);
     setStaff([]);
     setAttachment(null);
     setPageError("");
@@ -929,6 +977,64 @@ export default function App() {
             <strong>{stats.rejected}</strong>
           </div>
         </section>
+
+        {isAdmin && (
+          <section className="content-section">
+            <div className="section-heading">
+              <div>
+                <h2>Create HOD / Faculty account</h2>
+                <p className="muted">Create staff logins and assign each account to its department. Staff accounts are created by the administrator only.</p>
+              </div>
+              <span className="count-label">{staffAccounts.length} staff account{staffAccounts.length === 1 ? "" : "s"}</span>
+            </div>
+            <form className="application-form form-stack" onSubmit={handleCreateStaffAccount}>
+              <div className="form-grid">
+                <label>Full name
+                  <input value={staffAccountForm.name} onChange={(event) => setStaffAccountForm((previous) => ({ ...previous, name: event.target.value }))} placeholder="Enter staff member's name" required />
+                </label>
+                <label>Email address
+                  <input type="email" value={staffAccountForm.email} onChange={(event) => setStaffAccountForm((previous) => ({ ...previous, email: event.target.value }))} placeholder="staff@college.edu" required />
+                </label>
+                <label>Temporary password (minimum 8 characters)
+                  <input type="password" minLength={8} value={staffAccountForm.password} onChange={(event) => setStaffAccountForm((previous) => ({ ...previous, password: event.target.value }))} placeholder="Create a secure password" required />
+                </label>
+                <label>Account role
+                  <select value={staffAccountForm.role} onChange={(event) => setStaffAccountForm((previous) => ({ ...previous, role: event.target.value }))} required>
+                    <option value="faculty">Faculty</option>
+                    <option value="hod">Head of Department (HOD)</option>
+                  </select>
+                </label>
+                <label>Department
+                  <select value={staffAccountForm.department} onChange={(event) => setStaffAccountForm((previous) => ({ ...previous, department: event.target.value }))} required>
+                    {DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}
+                  </select>
+                </label>
+              </div>
+              <button className="button" disabled={loading}>{loading ? "Creating account..." : `Create ${staffAccountForm.role === "hod" ? "HOD" : "Faculty"} Account`}</button>
+            </form>
+            <div className="section-heading" style={{ marginTop: 26 }}>
+              <div><h2>Existing staff accounts</h2><p className="muted">Review staff roles and department assignments.</p></div>
+            </div>
+            {staffAccounts.length === 0 ? (
+              <div className="empty-state"><h3>No staff accounts yet</h3><p className="muted">Create a faculty or HOD account using the form above.</p></div>
+            ) : (
+              <div className="application-list">
+                {staffAccounts.map((member) => (
+                  <article className="application-card" key={getId(member)}>
+                    <div className="application-card-top">
+                      <div>
+                        <p className="eyebrow">{member.role === "hod" ? "HEAD OF DEPARTMENT" : "FACULTY"}</p>
+                        <h3>{member.name}</h3><p className="muted">{member.email}</p>
+                      </div>
+                      <span className="count-label">{member.department}</span>
+                    </div>
+                    <p className="muted">Created: {formatDate(member.createdAt)}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {isStudent && (
           <section className="content-section">
