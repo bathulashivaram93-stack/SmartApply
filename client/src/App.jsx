@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
-
+import "./style.css";
 const DEPARTMENTS = [
   "CSE",
   "ECE",
