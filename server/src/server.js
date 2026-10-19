@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 import express from "express";
-import cors from "cors";
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dns from "node:dns";
@@ -10,17 +10,36 @@ import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import applicationRoutes from "./routes/applications.js";
+import cors from "cors";
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://smart-apply-lake.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header, such as health checks.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+app.options(/.*/, cors());
 dns.setServers(["8.8.8.8"]);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Allow requests from the local frontend and deployed Vercel frontend.
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://smart-apply-lake.vercel.app",
-];
 
 app.use(
   cors({
