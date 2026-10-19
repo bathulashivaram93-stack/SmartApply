@@ -1,16 +1,17 @@
-
+import bcrypt from "bcryptjs";
 import "dotenv/config";
 import express from "express";
-
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 import dns from "node:dns";
+import cors from "cors";
 
 import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import applicationRoutes from "./routes/applications.js";
-import cors from "cors";
+
+const app = express();
+const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -20,24 +21,17 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests without an Origin header, such as health checks.
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS blocked origin: ${origin}`));
-    },
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+app.use(express.json({ limit: "1mb" }));
 app.options(/.*/, cors());
+
 dns.setServers(["8.8.8.8"]);
 
-const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Allow requests from the local frontend and deployed Vercel frontend.
 
