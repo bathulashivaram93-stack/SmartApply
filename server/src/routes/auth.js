@@ -12,53 +12,116 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
-    department: user.department || null
+    department: user.department || null,
+    rollNo: user.rollNo || null,
   };
 }
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, department } = req.body;
-    if (!name?.trim() || !email?.trim() || !password || !department) {
-      return res.status(400).json({ message: "Name, email, password and department are required" });
+    const { name, email, password, department, rollNo } = req.body;
+
+    if (
+      !name?.trim() ||
+      !email?.trim() ||
+      !password ||
+      !department
+    ) {
+      return res.status(400).json({
+        message: "Name, email, password and department are required.",
+      });
     }
-    if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
-    if (!DEPARTMENTS.includes(department)) return res.status(400).json({ message: "Choose a valid department" });
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must contain at least 8 characters.",
+      });
+    }
+
+    if (!DEPARTMENTS.includes(department)) {
+      return res.status(400).json({
+        message: "Invalid department.",
+      });
+    }
 
     const normalizedEmail = email.trim().toLowerCase();
-    if (await User.findOne({ email: normalizedEmail })) {
-      return res.status(409).json({ message: "This email is already registered" });
+
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "An account with this email already exists.",
+      });
     }
+
+    const normalizedRollNo = rollNo?.trim().toUpperCase() || null;
+
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       password: await bcrypt.hash(password, 12),
       role: "student",
-      department
+      department,
+      rollNo: normalizedRollNo,
     });
-    return res.status(201).json({ message: "Student account created. You can now log in.", user: publicUser(user) });
+
+    return res.status(201).json({
+      message: "Student account created. You can now log in.",
+      user: publicUser(user),
+    });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ message: "This email is already registered" });
-    console.error("Registration error:", error.message);
-    return res.status(500).json({ message: "Could not register account" });
+    console.error("Registration error:", error);
+
+    return res.status(500).json({
+      message: "Registration failed.",
+    });
   }
 });
 
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email?.trim() || !password) return res.status(400).json({ message: "Email and password are required" });
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() }).select("+password");
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (!email?.trim() || !password) {
+      return res.status(400).json({
+        message: "Email and password are required.",
+      });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "12h" });
-    return res.json({ token, user: publicUser(user) });
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    }).select("+password");
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        message: "Invalid email or password.",
+      });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "JWT_SECRET is not configured.",
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      token,
+      user: publicUser(user),
+    });
   } catch (error) {
-    console.error("Login error:", error.message);
-    return res.status(500).json({ message: "Login failed" });
+    console.error("Login error:", error);
+
+    return res.status(500).json({
+      message: "Login failed.",
+    });
   }
 });
 
