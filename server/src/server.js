@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 // Allow requests from the local frontend and deployed Vercel frontend.
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://smart-apply-c4hebvxfq-shiva-6062.vercel.app",
+  "https://smart-apply-lake.vercel.app",
 ];
 
 app.use(
