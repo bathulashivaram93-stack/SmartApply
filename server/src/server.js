@@ -16,9 +16,17 @@ dns.setServers(["8.8.8.8"]);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Allow requests from the local frontend and deployed Vercel frontend.
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://smart-apply-c4hebvxfq-shiva-6062.vercel.app",
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -36,16 +44,17 @@ async function connectDB() {
     throw new Error("Missing JWT_SECRET environment variable");
   }
 
-  if (dbPromise) {
-    return dbPromise;
-  }
-
   if (mongoose.connection.readyState === 1) {
     return;
   }
 
+  if (dbPromise) {
+    return dbPromise;
+  }
+
   dbPromise = (async () => {
     await mongoose.connect(process.env.MONGO_URI);
+
     console.log("MongoDB connected successfully");
 
     // Create the default admin if it does not exist.
@@ -71,7 +80,16 @@ async function connectDB() {
   return dbPromise;
 }
 
-// Ensure the database is ready before handling API requests.
+// Health check: verifies that the API is responding.
+// This does not guarantee MongoDB is connected.
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "SmartApply API",
+  });
+});
+
+// Ensure MongoDB is ready before handling application API requests.
 app.use(async (_req, _res, next) => {
   try {
     await connectDB();
@@ -81,26 +99,24 @@ app.use(async (_req, _res, next) => {
   }
 });
 
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    service: "SmartApply API",
-  });
-});
-
+// API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/applications", applicationRoutes);
 
+// Error handler
 app.use((err, _req, res, _next) => {
   console.error("Unhandled API error:", err.message);
-  res.status(500).json({ message: "Unexpected server error" });
+
+  res.status(500).json({
+    message: "Unexpected server error",
+  });
 });
 
-// IMPORTANT: Export the Express app for Vercel.
+// Export the Express app for Vercel.
 export default app;
 
-// Start a normal HTTP server only when running locally.
+// Start a local HTTP server outside Vercel.
 if (process.env.VERCEL !== "1") {
   app.listen(PORT, () => {
     console.log(`SmartApply API listening on ${PORT}`);
